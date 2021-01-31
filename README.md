@@ -1,6 +1,6 @@
-# Pi ic2 DAC
+# Pi i2c DAC
 
 Reading and writing
-[ic2 DAC](https://www.adafruit.com/product/935) with
+[i2c DAC](https://www.adafruit.com/product/935) with
 [pigpio](http://abyz.me.uk/rpi/pigpio/)
 
