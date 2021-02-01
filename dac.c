@@ -1,5 +1,8 @@
 #include "dac.h"
 
+char data[3] = {WRITE_BYTE,0xFF,0xFF};
+int handle;
+
 int main(void) {
     if (gpioInitialise() < 0) {
         fatal("could not initialize gpio\n");
@@ -11,23 +14,20 @@ int main(void) {
     signal(SIGINT, onInterrupt);
 
     // get handle for the chip
-    int handle;
     handle = i2cOpen(1, ADDRESS, 0);
     if (handle < 0) i2cError(handle);
     char *line = NULL;
     size_t len = 0;
     ssize_t nread;
-    char buf[3];
-    char data[3] = {WRITE_BYTE,0xFF,0xFF};
 
     while (1) {
-        printf("> ");
         nread = getline(&line, &len, stdin);
-        if (nread < 0) fatal("bad input");
+        if (nread < 0) exit(errno);
         if (strstr(line, "quit")) {
             exit(EXIT_SUCCESS);
         }
         else if (strstr(line, "read")) {
+            char buf[3];
             int err = i2cReadDevice(handle, buf, 3);
             if (err <= 0) i2cError(err);
             for (int i = 0; i < 3; ++i)
@@ -42,7 +42,14 @@ int main(void) {
             data[2] = SECOND_BYTE(value);
             int err = i2cWriteDevice(handle, data, 3);
             if (err) i2cError(err);
-            puts("write OK");
+        }
+        else if (strstr(line, "cycle")) {
+            int err = gpioSetTimerFunc(0, 20, cycle);
+            if (err) fatal("Setting timer failed");
+            // exit cycle with a keypress
+            getchar();
+            err = gpioSetTimerFunc(0, 20, NULL);
+            if (err) fatal("Setting timer failed");
         }
         else {
             puts(
@@ -55,6 +62,15 @@ int main(void) {
     }
     
     exit(EXIT_FAILURE); // unreachable
+}
+
+void cycle(void) {
+    static unsigned value = 0;
+    value = (value + 10) % 4096;
+    data[1] = FIRST_BYTE(value);
+    data[2] = SECOND_BYTE(value);
+    int err = i2cWriteDevice(handle, data, 3);
+    if (err) i2cError(err);
 }
 
 void fatal(const char* message) {
@@ -93,7 +109,6 @@ void i2cError(int error) {
 // runs after a call to exit()
 void onExit(void) {
     gpioTerminate();
-    printf("\ngoodbye\n");
 }
 
 // ctrl+c handler

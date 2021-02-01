@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,6 +13,7 @@
 #define FIRST_BYTE(n) (n / 16)
 #define SECOND_BYTE(n) ((n % 16) << 4)
 
+void cycle(void);
 void fatal(const char*);
 void i2cError(int);
 void onExit(void);
