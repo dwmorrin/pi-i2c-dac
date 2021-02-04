@@ -2,6 +2,8 @@
 
 char data[3] = {WRITE_BYTE,0xFF,0xFF};
 int handle;
+unsigned step = 1;
+unsigned period = 20; // milliseconds
 
 int main(void) {
     if (gpioInitialise() < 0) {
@@ -26,6 +28,16 @@ int main(void) {
         if (strstr(line, "quit")) {
             exit(EXIT_SUCCESS);
         }
+        else if (strstr(line, "step")) {
+            int numRead = sscanf(line, "step %u", &step);
+            if (numRead != 1) fatal("did not get a number for step");
+            if (step < 1) fatal("bad value");
+        }
+        else if (strstr(line, "period")) {
+            int numRead = sscanf(line, "period %u", &period);
+            if (numRead != 1) fatal("did not get a number for period");
+            if (period < 10 || period > 60000) fatal("bad value");
+        }
         else if (strstr(line, "read")) {
             char buf[3];
             int err = i2cReadDevice(handle, buf, 3);
@@ -44,18 +56,21 @@ int main(void) {
             if (err) i2cError(err);
         }
         else if (strstr(line, "cycle")) {
-            int err = gpioSetTimerFunc(0, 20, cycle);
+            int err = gpioSetTimerFunc(0, period, cycle);
             if (err) fatal("Setting timer failed");
             // exit cycle with a keypress
             getchar();
-            err = gpioSetTimerFunc(0, 20, NULL);
+            err = gpioSetTimerFunc(0, period, NULL);
             if (err) fatal("Setting timer failed");
         }
         else {
             puts(
-                "Commands: \n"
-                "read\n"
-                "write\n"
+                "Commands:\n"
+                "\tread - get current value\n"
+                "\twrite <integer> - set current value\n"
+                "\tcycle - start cycle (newline to stop)\n"
+                "\tstep <integer> - set cycle step\n"
+                "\tperiod <integer> - set cycle period\n"
                 "quit\n"
             );
         }
@@ -66,7 +81,7 @@ int main(void) {
 
 void cycle(void) {
     static unsigned value = 0;
-    value = (value + 10) % 4096;
+    value = (value + step) % DAC_MAX_PLUS_1;
     data[1] = FIRST_BYTE(value);
     data[2] = SECOND_BYTE(value);
     int err = i2cWriteDevice(handle, data, 3);
