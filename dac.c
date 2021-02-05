@@ -46,31 +46,38 @@ int main(void) {
                 printf("[%d]", buf[i]);
             puts("");
         }
-        else if (strstr(line, "write")) {
+        else if (isdigit(line[0]) || strstr(line, "write")) {
             unsigned value = 0;
-            sscanf(line, "write %u", &value);
+            unsigned delay = 0;
+            sscanf(line, isdigit(line[0]) ? "%u %u" : "write %u %u", &value, &delay);
             if (value < 0 || value > 4095) fatal("bad value");
             data[1] = FIRST_BYTE(value);
             data[2] = SECOND_BYTE(value);
             int err = i2cWriteDevice(handle, data, 3);
             if (err) i2cError(err);
+            err = usleep(delay * 1e3);
+            if (err) fatal("sleep failed\n");
         }
         else if (strstr(line, "cycle")) {
+            unsigned delay = 0;
+            sscanf(line, "cycle %u", &delay);
             int err = gpioSetTimerFunc(0, period, cycle);
             if (err) fatal("Setting timer failed");
-            // exit cycle with a keypress
-            getchar();
+            err = usleep(delay * 1e3);
+            if (err) fatal("sleep failed\n");
             err = gpioSetTimerFunc(0, period, NULL);
             if (err) fatal("Setting timer failed");
         }
         else {
             puts(
                 "Commands:\n"
+                "(arguments inside \"<>\" are positive integers)\n"
                 "\tread - get current value\n"
-                "\twrite <integer> - set current value\n"
-                "\tcycle - start cycle (newline to stop)\n"
-                "\tstep <integer> - set cycle step\n"
-                "\tperiod <integer> - set cycle period\n"
+                "\twrite <value> <delay> - set current value for milliseconds\n"
+                "\t<value> - shorthand for write\n"
+                "\tcycle <delay> - cycle for milliseconds\n"
+                "\tstep <value> - set cycle step\n"
+                "\tperiod <value> - set cycle period\n"
                 "quit\n"
             );
         }
@@ -90,7 +97,7 @@ void cycle(void) {
 
 void fatal(const char* message) {
     fprintf(stderr, "%s\n", message);
-    exit(EXIT_FAILURE);
+    exit(errno);
 }
 
 void i2cError(int error) {
